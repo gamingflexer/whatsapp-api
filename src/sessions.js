@@ -229,8 +229,10 @@ const initializeEvents = (client, sessionId) => {
 
   checkIfEventisEnabled('message')
     .then(_ => {
+      console.log()
       client.on('message', async (message) => {
         triggerWebhook(sessionWebhook, sessionId, 'message', { message })
+        
         if (message.hasMedia && message._data?.size < maxAttachmentSize) {
           // custom service event
           checkIfEventisEnabled('media').then(_ => {
@@ -251,6 +253,8 @@ const initializeEvents = (client, sessionId) => {
   checkIfEventisEnabled('message_ack')
     .then(_ => {
       client.on('message_ack', async (message, ack) => {
+        console.log("message_ack")
+        console.log({message})
         triggerWebhook(sessionWebhook, sessionId, 'message_ack', { message, ack })
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
@@ -262,6 +266,8 @@ const initializeEvents = (client, sessionId) => {
   checkIfEventisEnabled('message_create')
     .then(_ => {
       client.on('message_create', async (message) => {
+        console.log("message_create")
+        console.log({message})
         triggerWebhook(sessionWebhook, sessionId, 'message_create', { message })
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
