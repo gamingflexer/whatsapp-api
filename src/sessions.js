@@ -4,7 +4,13 @@ const path = require('path')
 const sessions = new Map()
 const { baseWebhookURL, sessionFolderPath, maxAttachmentSize, setMessagesAsSeen, webVersion, webVersionCacheType, recoverSessions } = require('./config')
 const { triggerWebhook, waitForNestedObject, checkIfEventisEnabled } = require('./utils')
+const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
+const { globalApiKey } = require('./config')
+// const FormData = require('form-data');
 
+js_server_url = "http://34.133.7.116:3000";
+django_server_url = "http://34.133.7.116:8000"
 // Function to validate if the session is ready
 const validateSession = async (sessionId) => {
   try {
@@ -227,34 +233,143 @@ const initializeEvents = (client, sessionId) => {
       })
     })
 
-  checkIfEventisEnabled('message')
-    .then(_ => {
-      console.log()
+    checkIfEventisEnabled('message').then(_ => {
       client.on('message', async (message) => {
-        triggerWebhook(sessionWebhook, sessionId, 'message', { message })
+        console.log("--------------");
+        console.log(message._data);
+        console.log("--------------");
+        const { id, body, type, from, to, notifyName } = message._data;
+
+        if (id.remote != 'status@broadcast') {
+            const formData = new FormData();
+
+            if (type == 'ptt') {
+              try {
+                const filename = `${uuidv4()}.ogg`;
+                const media = await message.downloadMedia();
+                
+                if (media) {
+                    const binaryData = Buffer.from(media.data, 'base64');
+                    fs.writeFileSync(`./user_audio_file/${filename}`, binaryData);
+                    
+                    // Create a Blob object from binary data
+                    const fileBlob = new Blob([binaryData], { type: 'audio/ogg' });
         
-        if (message.hasMedia && message._data?.size < maxAttachmentSize) {
-          // custom service event
-          checkIfEventisEnabled('media').then(_ => {
-            message.downloadMedia().then(messageMedia => {
-              triggerWebhook(sessionWebhook, sessionId, 'media', { messageMedia, message })
-            }).catch(e => {
-              console.log('Download media error:', e.message)
-            })
-          })
+                    formData.append('file', fileBlob, filename);
+                } else {
+                    console.error('Error: Media is undefined or null');
+                }
+            } catch (error) {
+                console.error('Error saving or appending file:', error);
+            }
+            }
+
+            formData.append('message', body);
+            formData.append('type', type);
+            formData.append('from', from);
+            formData.append('phone_number', to);
+            formData.append('user_profile_name', notifyName);
+
+            console.log(formData);
+
+            const headers = {
+                'x-api-key': globalApiKey
+            };
+
+            try {
+                const python_response = await axios.post(`${django_server_url}/whatsapp/session/send-message`, formData, {  'Content-Type': `multipart/form-data; boundary=${formData._boundary}` });
+                console.log('Response:', python_response.data);
+                console.log('Response:', python_response.data.data.type);
+                var sessionId = python_response.data.data.session_id;
+                console.log(sessionId);
+
+              
+                const chatUrl = `${js_server_url}/client/sendMessage/${sessionId}`;
+                var chatPostData;
+                if(python_response.data.data.reply_type == "audio")
+                {
+                  chatPostData = {
+                    "chatId": "919967380806@c.us",
+                    "contentType": "MessageMedia",
+                    "content": {
+                      "mimetype": "audio/mp3",
+                      "data": python_response.data.data.audio_converted,
+                      "filename": "audio.mp3"
+                    }
+                    
+                  }
+                }
+                else{
+                  chatPostData = {
+                    "chatId": "919967380806@c.us",
+                    "contentType": "string",
+                    "content": python_response.data.data.query_answer
+                  }
+                }
+                try {
+                  const response = await axios.post(chatUrl, chatPostData, { headers });
+                  console.log('Response:', response.data);
+              } catch (error) {
+                console.log("here is error ");
+                  console.error('Error sending POST request:', error.message);
+              }
+
+                // Handle response as needed
+            } catch (error) {
+                console.log("hmm error here");
+                if ((error.response) && (error.response.status == 400 || error.response.status == 500 )) {
+                    console.error('Error sending POST request. Status code:', error.response.data);
+                    console.error('Error sending POST request. Status code:', error.response.status);
+                    var sessionId = error.response.data.data.session_id;
+                    console.log(sessionId);
+
+                    const chatUrl = `${js_server_url}/client/sendMessage/${sessionId}`;
+                    var chatPostData = {
+                        "chatId": "919967380806@c.us",
+                        "contentType": "string",
+                        "content": error.response.data.message
+                    };
+
+                    try {
+                        const response = await axios.post(chatUrl, chatPostData, { headers });
+                        console.log('Response:', response.data);
+                        // Handle response as needed
+                    } catch (error) {
+                        console.error('Error sending POST request:', error.message);
+                        console.error('Error sending POST request. Status code:', error.response.data);
+                    }
+                } else {
+                  // handle if else condition
+                    console.error('Error sending POST request:', error.message);
+                    console.error('Error sending POST request. Status code:', error.response.data);
+                }
+            }
         }
-        if (setMessagesAsSeen) {
-          const chat = await message.getChat()
-          chat.sendSeen()
-        }
-      })
-    })
+  
+          triggerWebhook(sessionWebhook, sessionId, 'message', { message });
+  
+          if (message.hasMedia && message._data?.size < maxAttachmentSize) {
+              checkIfEventisEnabled('media').then(_ => {
+                  message.downloadMedia().then(messageMedia => {
+                      triggerWebhook(sessionWebhook, sessionId, 'media', { messageMedia, message });
+                  }).catch(e => {
+                      console.log('Download media error:', e.message);
+                  });
+              });
+          }
+  
+          if (setMessagesAsSeen) {
+              const chat = await message.getChat();
+              chat.sendSeen();
+          }
+      });
+  });
+  
 
   checkIfEventisEnabled('message_ack')
     .then(_ => {
       client.on('message_ack', async (message, ack) => {
-        console.log("message_ack")
-        console.log({message})
+        
         triggerWebhook(sessionWebhook, sessionId, 'message_ack', { message, ack })
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
@@ -266,8 +381,7 @@ const initializeEvents = (client, sessionId) => {
   checkIfEventisEnabled('message_create')
     .then(_ => {
       client.on('message_create', async (message) => {
-        console.log("message_create")
-        console.log({message})
+        
         triggerWebhook(sessionWebhook, sessionId, 'message_create', { message })
         if (setMessagesAsSeen) {
           const chat = await message.getChat()
