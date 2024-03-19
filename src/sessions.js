@@ -289,7 +289,7 @@ const initializeEvents = (client, sessionId) => {
                 if(python_response.data.data.reply_type == "audio")
                 {
                   chatPostData = {
-                    "chatId": "919967380806@c.us",
+                    "chatId": from,
                     "contentType": "MessageMedia",
                     "content": {
                       "mimetype": "audio/mp3",
@@ -301,7 +301,7 @@ const initializeEvents = (client, sessionId) => {
                 }
                 else{
                   chatPostData = {
-                    "chatId": "919967380806@c.us",
+                    "chatId": from,
                     "contentType": "string",
                     "content": python_response.data.data.query_answer
                   }
@@ -325,7 +325,7 @@ const initializeEvents = (client, sessionId) => {
 
                     const chatUrl = `${js_server_url}/client/sendMessage/${sessionId}`;
                     var chatPostData = {
-                        "chatId": "919967380806@c.us",
+                        "chatId": from,
                         "contentType": "string",
                         "content": error.response.data.message
                     };
