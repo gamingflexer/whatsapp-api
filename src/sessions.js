@@ -238,13 +238,27 @@ const initializeEvents = (client, sessionId) => {
         console.log("--------------");
         console.log(message._data);
         console.log("--------------");
+        
+        var sessionId = client.options.authStrategy.clientId
+        
         const { id, body, type, from, to, notifyName } = message._data;
 
         if (id.remote != 'status@broadcast') {
             const formData = new FormData();
+            const headers = {
+              'x-api-key': globalApiKey
+          };
+          try {
+              stateUrl = `${js_server_url}/chat/sendStateTyping/${sessionId}`;
+              const response = await axios.post(stateUrl, {"chatId": from}, { headers });
+              
+          } catch (error) {
+              console.error('Error while typing:', error.message);
+          }
 
             if (type == 'ptt') {
               try {
+                
                 const filename = `${uuidv4()}.ogg`;
                 const media = await message.downloadMedia();
                 
@@ -270,18 +284,14 @@ const initializeEvents = (client, sessionId) => {
             formData.append('phone_number', to);
             formData.append('user_profile_name', notifyName);
 
-            console.log(formData);
 
-            const headers = {
-                'x-api-key': globalApiKey
-            };
-
+            
+            try{
             try {
                 const python_response = await axios.post(`${django_server_url}/whatsapp/session/send-message`, formData, {  'Content-Type': `multipart/form-data; boundary=${formData._boundary}` });
-                console.log('Response:', python_response.data);
-                console.log('Response:', python_response.data.data.type);
-                var sessionId = python_response.data.data.session_id;
-                console.log(sessionId);
+                
+                sessionId = python_response.data.data.session_id;
+                
 
               
                 const chatUrl = `${js_server_url}/client/sendMessage/${sessionId}`;
@@ -308,28 +318,35 @@ const initializeEvents = (client, sessionId) => {
                 }
                 try {
                   const response = await axios.post(chatUrl, chatPostData, { headers });
-                  console.log('Response:', response.data);
+                  
               } catch (error) {
-                console.log("here is error ");
                   console.error('Error sending POST request:', error.message);
               }
 
                 // Handle response as needed
             } catch (error) {
-                console.log("hmm error here");
                 if ((error.response) && (error.response.status == 400 || error.response.status == 500 )) {
                     console.error('Error sending POST request. Status code:', error.response.data);
                     console.error('Error sending POST request. Status code:', error.response.status);
                     var sessionId = error.response.data.data.session_id;
-                    console.log(sessionId);
-
+                    var chatPostData;
                     const chatUrl = `${js_server_url}/client/sendMessage/${sessionId}`;
-                    var chatPostData = {
-                        "chatId": from,
+                    if(error.response.data.data.msg_type == "subscription_expired" && error.response.data.data.chatbot_type =="business_owner" )
+                    {
+                      chatPostData = {
+                        // if could not able to send the message of subscription expire then please check for chatId
+                        "chatId": error.response.data.data.business_owner_phone_number_cc +"@c.us",
                         "contentType": "string",
                         "content": error.response.data.message
                     };
-
+                    }
+                    else{
+                      chatPostData = {
+                          "chatId": from,
+                          "contentType": "string",
+                          "content": error.response.data.message
+                      };
+                  }
                     try {
                         const response = await axios.post(chatUrl, chatPostData, { headers });
                         console.log('Response:', response.data);
@@ -344,6 +361,10 @@ const initializeEvents = (client, sessionId) => {
                     console.error('Error sending POST request. Status code:', error.response.data);
                 }
             }
+          }
+          catch{
+            console.log("Something went wrong at django server.")
+          }
         }
   
           triggerWebhook(sessionWebhook, sessionId, 'message', { message });
