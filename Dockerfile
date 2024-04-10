@@ -4,7 +4,7 @@ FROM node:20-alpine
 # Set the working directory
 WORKDIR /usr/src/app
 
-# Install Chromium
+# Install Chromium and Git
 ENV CHROME_BIN="/usr/bin/chromium-browser" \
     PUPPETEER_SKIP_CHROMIUM_DOWNLOAD="true" \
     NODE_ENV="production" \
