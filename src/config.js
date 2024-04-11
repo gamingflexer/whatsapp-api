@@ -5,9 +5,9 @@ require('dotenv').config()
 const sessionFolderPath = process.env.SESSIONS_PATH || './sessions'
 const enableLocalCallbackExample = (process.env.ENABLE_LOCAL_CALLBACK_EXAMPLE || '').toLowerCase() === 'true'
 const globalApiKey = process.env.API_KEY || 'INigujhi657HBHGHVhvtkv9vbgcj3y'
-// const baseWebhookURL = process.env.BASE_WEBHOOK_URL || 'https://api-wa.gracehopper.ai/localCallbackExample'
-const baseWebhookURL = 'https://api-wa.gracehopper.ai/localCallbackExample'
-console.log("baseWebhookURL-->", baseWebhookURL)
+// const baseWebhookURL = process.env.BASE_WEBHOOK_URL || 'https://wa-wrapper-lxx7xephrq-as.a.run.app/localCallbackExample'
+const baseWebhookURL = 'http://34.133.7.116:3000/localCallbackExample'
+console.log("BASE_WEBHOOK_URL - baseWebhookURL-->", baseWebhookURL)
 const maxAttachmentSize = parseInt(process.env.MAX_ATTACHMENT_SIZE) || 10000000
 const setMessagesAsSeen = (process.env.SET_MESSAGES_AS_SEEN || '').toLowerCase() === 'true'
 // const disabledCallbacks = process.env.DISABLED_CALLBACKS ? process.env.DISABLED_CALLBACKS.split('|') : [] 
